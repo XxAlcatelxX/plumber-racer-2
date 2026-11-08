@@ -1,0 +1,40 @@
+name: Build Plumber Racer 2 IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      exefs_zip_url:
+        description: 'Enlace directo al ZIP con la carpeta base/exefs'
+        required: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar herramientas de compilación
+        run: |
+          brew install xcodegen zstd glslang
+          brew install --cask dotnet-sdk
+          python3 -m venv .venv
+          source .venv/bin/activate
+          python3 -m pip install lz4 "capstone>=5,<6" fonttools nsz zbic "backports.zstd; python_version < '3.14'"
+
+      - name: Descargar y preparar estructura del juego
+        run: |
+          mkdir -p "$HOME/Games/Mario Kart World/base/romfs"
+          curl -L "${{ github.event.inputs.exefs_zip_url }}" -o exefs.zip
+          unzip -q exefs.zip -d "$HOME/Games/Mario Kart World/"
+
+      - name: Compilar IPA (Shaders y código)
+        run: |
+          source .venv/bin/activate
+          python3 scripts/build_ipa_from_nsp.py "$HOME/Games/Mario Kart World" --platform ios --romfs separate
+
+      - name: Subir MarioKartWorld.ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: MarioKartWorld-IPA
+          path: "$HOME/Games/Mario Kart World/MarioKartWorld.ipa"
